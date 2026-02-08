@@ -1,6 +1,7 @@
 import { Course, CourseType, Grade, NewsItem, UserStats } from './types';
 import { findPoemEntry } from './poems';
 import { getDynastyByAuthor } from './poetryMeta';
+import { VIDEO_REGISTRY } from './videoRegistry';
 
 export const APP_NAME = "吟诗舞韵";
 
@@ -25,11 +26,9 @@ export const AI_SYSTEM_INSTRUCTION = `
 2）如果孩子的问题超出诗词学习范围，先温柔回应，再把话题拉回到“诗词/朗读/节奏/想象画面”。
 `;
 
-const VIDEO_URLS = import.meta.glob('./videos/*.{mp4,MP4}', {
-  eager: true,
-  query: '?url',
-  import: 'default',
-}) as Record<string, string>;
+const VIDEO_BASE_URL =
+  import.meta.env.VITE_VIDEO_BASE_URL ||
+  'https://media.githubusercontent.com/media/LIbShen/StormPlan-yswy.github.io/main/videos';
 
 const COVER_URLS = import.meta.glob('./Cover/*.{jpg,JPG,jpeg,JPEG}', {
   eager: true,
@@ -50,6 +49,8 @@ const getBasename = (path: string) => {
   const file = path.split('/').pop() || path;
   return file.replace(/\.(mp4|MP4|jpg|JPG|jpeg|JPEG)$/, '');
 };
+
+const getVideoUrl = (filename: string) => `${VIDEO_BASE_URL}/${encodeURIComponent(filename)}`;
 
 const parseGrade = (basename: string): Grade => {
   const match = basename.match(/([一二三四五六])年级/);
@@ -120,12 +121,12 @@ const buildCoursesFromAssets = (): Course[] => {
     coverByBasename.set(getBasename(path), url);
   }
 
-  const items = Object.entries(VIDEO_URLS).map(([path, url]) => {
-    const basename = getBasename(path);
+  const items = VIDEO_REGISTRY.map((filename) => {
+    const basename = filename.replace(/\.(mp4|MP4)$/, '');
     const grade = parseGrade(basename);
     const semester = parseSemester(basename);
     const title = parseTitle(basename);
-    return { basename, grade, semester, title, videoUrl: url };
+    return { basename, grade, semester, title, videoUrl: getVideoUrl(filename) };
   });
 
   const semesterOrder = (s: '上册' | '下册' | null) => (s === '上册' ? 0 : s === '下册' ? 1 : 2);
