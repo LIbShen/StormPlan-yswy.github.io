@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { TRANSLATIONS } from '../constants';
 import { Globe, User, LogOut, Bot, X, GraduationCap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -17,31 +17,8 @@ export const Settings: React.FC<SettingsProps> = ({ lang, setLang }) => {
   const [nameDraft, setNameDraft] = useState(auth.settings?.displayName || '');
   const [gradeDraft, setGradeDraft] = useState<Grade>(auth.settings?.grade || Grade.ONE);
   const [error, setError] = useState<string | null>(null);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [aiSavedAt, setAiSavedAt] = useState(0);
   const grades: Grade[] = [Grade.ONE, Grade.TWO, Grade.THREE, Grade.FOUR, Grade.FIVE, Grade.SIX];
-  const aiConfig = useMemo(() => getAiRuntimeConfig(), [aiSavedAt]);
-  const [aiBaseUrl, setAiBaseUrl] = useState(() => {
-    try {
-      return window.localStorage.getItem('yswy_nvidia_base_url') || '';
-    } catch {
-      return '';
-    }
-  });
-  const [aiModel, setAiModel] = useState(() => {
-    try {
-      return window.localStorage.getItem('yswy_nvidia_model') || '';
-    } catch {
-      return '';
-    }
-  });
-  const [aiKey, setAiKey] = useState(() => {
-    try {
-      return window.localStorage.getItem('yswy_nvidia_api_key') || '';
-    } catch {
-      return '';
-    }
-  });
+  const aiConfig = getAiRuntimeConfig();
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -106,91 +83,6 @@ export const Settings: React.FC<SettingsProps> = ({ lang, setLang }) => {
                    <span className="font-bold text-gray-700">{t.settings_ai_model}</span>
                    <span className="text-right break-all">{aiConfig.model}</span>
                </div>
-               <div className="flex items-center justify-between gap-4">
-                   <span className="font-bold text-gray-700">API 地址</span>
-                   <span className="text-right break-all">{aiConfig.useProxy ? '开发环境走 /nvidia 代理' : aiConfig.baseUrl}</span>
-               </div>
-               <div className="flex items-center justify-between gap-4">
-                   <span className="font-bold text-gray-700">API Key</span>
-                   <span className="text-right break-all">{aiConfig.hasApiKey ? '已配置' : '未配置'}</span>
-               </div>
-           </div>
-           <div className="mt-4 space-y-3">
-             <div>
-               <div className="text-sm font-bold text-gray-700">API Key（仅保存在本机浏览器）</div>
-               <input
-                 value={aiKey}
-                 onChange={(e) => setAiKey(e.target.value)}
-                 placeholder="粘贴你的 NVIDIA Integrate API Key"
-                 className="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                 type="password"
-                 autoComplete="off"
-               />
-             </div>
-             <div>
-               <div className="text-sm font-bold text-gray-700">API 地址（可选）</div>
-               <input
-                 value={aiBaseUrl}
-                 onChange={(e) => setAiBaseUrl(e.target.value)}
-                 placeholder="例如：https://integrate.api.nvidia.com"
-                 className="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-               />
-             </div>
-             <div>
-               <div className="text-sm font-bold text-gray-700">模型（可选）</div>
-               <input
-                 value={aiModel}
-                 onChange={(e) => setAiModel(e.target.value)}
-                 placeholder="例如：minimaxai/minimax-m2.1"
-                 className="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-               />
-             </div>
-             {aiError && <div className="bg-rose-50 border border-rose-100 text-rose-700 rounded-2xl p-4 text-sm font-bold">{aiError}</div>}
-             <div className="flex items-center justify-end gap-3 pt-1">
-               <button
-                 className="px-6 h-11 rounded-2xl bg-gray-100 text-gray-700 font-extrabold hover:bg-gray-200 transition-colors"
-                 onClick={() => {
-                   try {
-                     window.localStorage.removeItem('yswy_nvidia_api_key');
-                     window.localStorage.removeItem('yswy_nvidia_base_url');
-                     window.localStorage.removeItem('yswy_nvidia_model');
-                     setAiKey('');
-                     setAiBaseUrl('');
-                     setAiModel('');
-                     setAiError(null);
-                     setAiSavedAt(Date.now());
-                   } catch {
-                     setAiError('无法访问本机存储（localStorage），请检查浏览器隐私设置。');
-                   }
-                 }}
-                 type="button"
-               >
-                 清除
-               </button>
-               <button
-                 className="px-6 h-11 rounded-2xl bg-primary text-white font-extrabold hover:brightness-110 transition-all"
-                 onClick={() => {
-                   try {
-                     const key = aiKey.trim();
-                     const base = aiBaseUrl.trim();
-                     const model = aiModel.trim();
-                     if (key) window.localStorage.setItem('yswy_nvidia_api_key', key);
-                     else window.localStorage.removeItem('yswy_nvidia_api_key');
-                     if (base) window.localStorage.setItem('yswy_nvidia_base_url', base);
-                     else window.localStorage.removeItem('yswy_nvidia_base_url');
-                     if (model) window.localStorage.setItem('yswy_nvidia_model', model);
-                     else window.localStorage.removeItem('yswy_nvidia_model');
-                     setAiError(null);
-                     setAiSavedAt(Date.now());
-                   } catch {
-                     setAiError('无法保存到本机存储（localStorage），请检查浏览器隐私设置。');
-                   }
-                 }}
-                 type="button"
-               >
-                 保存
-               </button>
-             </div>
            </div>
        </div>
 

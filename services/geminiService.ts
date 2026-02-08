@@ -1,39 +1,21 @@
 import { AI_SYSTEM_INSTRUCTION } from '../constants';
 
-const STORAGE_KEYS = {
-  apiKey: 'yswy_nvidia_api_key',
-  baseUrl: 'yswy_nvidia_base_url',
-  model: 'yswy_nvidia_model',
-} as const;
-
-const safeStorageGet = (key: string) => {
-  try {
-    return window.localStorage.getItem(key) || '';
-  } catch {
-    return '';
-  }
-};
-
 const getBaseUrl = () => {
-  const fromStorage = safeStorageGet(STORAGE_KEYS.baseUrl).trim();
   const raw =
-    fromStorage ||
-    (import.meta.env.VITE_NVIDIA_BASE_URL as string | undefined) ||
-    'https://integrate.api.nvidia.com';
+    (import.meta.env.VITE_NVIDIA_BASE_URL as string | undefined) || 'https://integrate.api.nvidia.com';
   return raw.replace(/\/+$/, '');
 };
 
 const getModel = () => {
-  const fromStorage = safeStorageGet(STORAGE_KEYS.model).trim();
-  return fromStorage || (import.meta.env.VITE_NVIDIA_MODEL as string | undefined) || 'minimaxai/minimax-m2.1';
+  return (import.meta.env.VITE_NVIDIA_MODEL as string | undefined) || 'minimaxai/minimax-m2.1';
 };
 
 const getApiKey = () => {
-  const fromStorage = safeStorageGet(STORAGE_KEYS.apiKey).trim();
-  return fromStorage || (import.meta.env.VITE_NVIDIA_API_KEY as string | undefined) || '';
+  return (import.meta.env.VITE_NVIDIA_API_KEY as string | undefined) || '';
 };
 
-const useProxy = import.meta.env.DEV;
+const baseUrlEnv = (import.meta.env.VITE_NVIDIA_BASE_URL as string | undefined) || '';
+const useProxy = import.meta.env.DEV && (!baseUrlEnv || /integrate\.api\.nvidia\.com/i.test(baseUrlEnv));
 
 const makeUrl = (path: string) => {
   if (useProxy) return `/nvidia${path}`;
@@ -43,15 +25,14 @@ const makeUrl = (path: string) => {
 export const getAiRuntimeConfig = () => {
   const baseUrl = getBaseUrl();
   const model = getModel();
-  const apiKey = getApiKey().trim();
-  return { baseUrl, model, hasApiKey: Boolean(apiKey), useProxy };
+  return { baseUrl, model, useProxy };
 };
 
 const buildHeaders = () => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  const key = getApiKey().trim();
+  const key = useProxy ? getApiKey().trim() : '';
   if (key) headers.Authorization = `Bearer ${key}`;
   return headers;
 };

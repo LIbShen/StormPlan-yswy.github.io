@@ -63,7 +63,7 @@ export const AI: React.FC<AIProps> = ({ lang }) => {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        text: `小诗暂时连不上模型接口。${detail ? `（${detail}）` : ''}\n请到“设置 → 小诗AI”填写 API Key；若已填写，再检查 API 地址和模型名称。`,
+        text: `小诗暂时连不上模型服务。${detail ? `（${detail}）` : ''}\n请稍后再试，或联系管理员检查 AI 网关配置。`,
         timestamp: new Date()
       }]);
     } finally {
