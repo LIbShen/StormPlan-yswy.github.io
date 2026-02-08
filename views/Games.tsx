@@ -309,7 +309,7 @@ export const Games: React.FC<GamesProps> = ({ lang }) => {
     const w = ctx.canvas.width;
     const h = ctx.canvas.height;
     if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
-      return { energy: 0, lr: 0, tb: 0, centerShare: 0, data: prev };
+      return { energy: 0, lr: 0, tb: 0, centerShare: 0, data: prev, tainted: false };
     }
 
     const srcW = video.videoWidth;
@@ -329,8 +329,13 @@ export const Games: React.FC<GamesProps> = ({ lang }) => {
       ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
     }
 
-    const frame = ctx.getImageData(0, 0, w, h).data;
-    if (!prev) return { energy: 0, lr: 0, tb: 0, centerShare: 0, data: new Uint8ClampedArray(frame) };
+    let frame: Uint8ClampedArray | null = null;
+    try {
+      frame = new Uint8ClampedArray(ctx.getImageData(0, 0, w, h).data);
+    } catch {
+      return { energy: 0, lr: 0, tb: 0, centerShare: 0, data: prev, tainted: true };
+    }
+    if (!prev) return { energy: 0, lr: 0, tb: 0, centerShare: 0, data: frame, tainted: false };
 
     let sum = 0;
     let left = 0;
@@ -362,7 +367,7 @@ export const Games: React.FC<GamesProps> = ({ lang }) => {
     const tb = (bottom - top) / Math.max(1, bottom + top);
     const centerShare = center / Math.max(1, sum);
 
-    return { energy, lr, tb, centerShare, data: new Uint8ClampedArray(frame) };
+    return { energy, lr, tb, centerShare, data: frame, tainted: false };
   };
 
   const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
@@ -454,6 +459,7 @@ export const Games: React.FC<GamesProps> = ({ lang }) => {
     const [tapToPlay, setTapToPlay] = useState(false);
     const [running, setRunning] = useState(false);
     const [sparkId, setSparkId] = useState(0);
+    const [syncPercent, setSyncPercent] = useState(0);
     const [bgTheme, setBgTheme] = useState<(typeof bgThemes)[number]>(() => {
       return bgThemes[Math.floor(Math.random() * bgThemes.length)];
     });
@@ -465,11 +471,14 @@ export const Games: React.FC<GamesProps> = ({ lang }) => {
     const lastTickAtRef = useRef(0);
     const warmupUntilRef = useRef(0);
     const syncEmaRef = useRef(0);
+    const lastUiAtRef = useRef(0);
     const webStatsRef = useRef<{ mean: number; var: number }>({ mean: 0, var: 0 });
     const refStatsRef = useRef<{ mean: number; var: number }>({ mean: 0, var: 0 });
     const webHistRef = useRef<Array<{ t: number; energy: number; lr: number; tb: number; center: number }>>([]);
     const refHistRef = useRef<Array<{ t: number; energy: number; lr: number; tb: number; center: number }>>([]);
     const actionRef = useRef<{ web: string; ref: string; group: string }>({ web: '动作跟随', ref: '动作跟随', group: 'generic' });
+    const lastWebActionRef = useRef<{ name: string; since: number }>({ name: '', since: 0 });
+    const refTaintedRef = useRef(false);
     const webPrevRef = useRef<Uint8ClampedArray | null>(null);
     const refPrevRef = useRef<Uint8ClampedArray | null>(null);
     const webCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -612,6 +621,10 @@ export const Games: React.FC<GamesProps> = ({ lang }) => {
       lastSparkAtRef.current = 0;
       warmupUntilRef.current = performance.now() + 1200;
       syncEmaRef.current = 0;
+      lastUiAtRef.current = 0;
+      setSyncPercent(0);
+      refTaintedRef.current = false;
+      lastWebActionRef.current = { name: '', since: 0 };
       webStatsRef.current = { mean: 0, var: 0 };
       refStatsRef.current = { mean: 0, var: 0 };
       webHistRef.current = [];
@@ -623,7 +636,10 @@ export const Games: React.FC<GamesProps> = ({ lang }) => {
       if (refVideo) {
         refVideo.muted = refMuted;
         refVideo.volume = 0.8;
-        refVideo.play().catch(() => setTapToPlay(true));
+        refVideo.play().catch(() => {
+          setTapToPlay(true);
+          setRefVisible(true);
+        });
       }
     }, [cameraReady, countdown, running, refMuted]);
 
@@ -815,15 +831,28 @@ export const Games: React.FC<GamesProps> = ({ lang }) => {
         }
         const groupBonus = sameGroup ? 1.18 : compatible ? 1.1 : 0.95;
         const score = clamp(best * groupBonus, 0, 1);
-        syncEmaRef.current = 0.85 * syncEmaRef.current + 0.15 * score;
-        const matched = score >= 0.52;
+        const hasRefSignal = !refTaintedRef.current && ref.energy > 0.2 && refVideo.readyState >= 2;
+        if (ref.tainted && !refTaintedRef.current) refTaintedRef.current = true;
+        if (webAct.name !== lastWebActionRef.current.name) {
+          lastWebActionRef.current = { name: webAct.name, since: ts };
+        }
+        const stableMs = ts - lastWebActionRef.current.since;
+        const activityScore = clamp((webZ - 0.2) / 1.2, 0, 1) * clamp(web.energy / 5, 0, 1);
+        const effectiveScore = hasRefSignal ? score : activityScore;
+        syncEmaRef.current = 0.85 * syncEmaRef.current + 0.15 * effectiveScore;
+        const matched = hasRefSignal ? score >= 0.45 : stableMs > 420 && activityScore > 0.35;
+        const encourage = hasRefSignal ? (score >= 0.25 && webZ > 0.35 && web.energy > 1.3) : stableMs > 220 && activityScore > 0.25;
+        if (ts - lastUiAtRef.current > 240) {
+          lastUiAtRef.current = ts;
+          setSyncPercent(Math.round(clamp(syncEmaRef.current, 0, 1) * 100));
+        }
 
         if (ts >= warmupUntilRef.current) {
           scoringRef.current.total += 1;
           if (matched) scoringRef.current.matched += 1;
         }
 
-        if (matched && ts - lastSparkAtRef.current > 220) {
+        if ((matched || encourage) && ts - lastSparkAtRef.current > (matched ? 220 : 900)) {
           lastSparkAtRef.current = ts;
           setSparkId((v) => v + 1);
           const phrase = praisePhrases[Math.floor(Math.random() * praisePhrases.length)];
@@ -1082,32 +1111,37 @@ export const Games: React.FC<GamesProps> = ({ lang }) => {
           </button>
         </div>
 
-        {refVisible && (
-          <div
-            className="absolute top-[76px] left-4 rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black relative"
-            style={{ width: refWidth }}
-          >
-            <video
-              ref={refVideoRef}
-              src={course.videoUrl}
-              playsInline
-              muted={refMuted}
-              controls
-              className="w-full aspect-video object-cover"
-            />
-            {tapToPlay && (
-              <button
-                className="absolute inset-0 flex items-center justify-center bg-black/55 text-white font-extrabold"
-                onClick={() => {
-                  const el = refVideoRef.current;
-                  if (!el) return;
-                  el.muted = refMuted;
-                  el.play().then(() => setTapToPlay(false)).catch(() => {});
-                }}
-              >
-                点一下播放
-              </button>
-            )}
+        <div
+          className="absolute rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black relative"
+          style={
+            refVisible
+              ? { width: refWidth, top: 76, left: 16 }
+              : { width: 1, height: 1, top: -10000, left: -10000, opacity: 0, pointerEvents: 'none' }
+          }
+        >
+          <video
+            ref={refVideoRef}
+            src={course.videoUrl}
+            crossOrigin="anonymous"
+            playsInline
+            muted={refMuted}
+            controls={refVisible}
+            className={refVisible ? 'w-full aspect-video object-cover' : 'w-full h-full object-cover'}
+          />
+          {tapToPlay && refVisible && (
+            <button
+              className="absolute inset-0 flex items-center justify-center bg-black/55 text-white font-extrabold"
+              onClick={() => {
+                const el = refVideoRef.current;
+                if (!el) return;
+                el.muted = refMuted;
+                el.play().then(() => setTapToPlay(false)).catch(() => {});
+              }}
+            >
+              点一下播放
+            </button>
+          )}
+          {refVisible && (
             <div className="px-3 py-2 bg-black/60 border-t border-white/10 flex items-center justify-between text-white/85">
               <div className="text-xs font-bold">参考视频</div>
               <div className="flex items-center gap-1">
@@ -1148,8 +1182,8 @@ export const Games: React.FC<GamesProps> = ({ lang }) => {
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {!refVisible && (
           <button
@@ -1319,11 +1353,11 @@ export const Games: React.FC<GamesProps> = ({ lang }) => {
           </div>
         )}
 
-        {countdown === 0 && (
+        {running && (
           <div className="absolute top-[76px] right-4 bg-black/40 border border-white/10 text-white rounded-2xl px-4 py-3">
-            <div className="text-xs text-white/70">同步率</div>
+            <div className="text-xs text-white/70">{refTaintedRef.current ? '动作活跃度' : '同步率'}</div>
             <div className="text-lg font-extrabold">
-              {Math.round(clamp(syncEmaRef.current, 0, 1) * 100)}%
+              {syncPercent}%
             </div>
           </div>
         )}
