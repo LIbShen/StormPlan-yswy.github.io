@@ -6,7 +6,7 @@ export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     const nvidiaBaseUrl = (env.VITE_NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com').replace(/\/+$/, '');
     return {
-      base: mode === 'production' ? (env.VITE_BASE || '/StormPlan-yswy.github.io/') : '/',
+      base: mode === 'production' ? (env.VITE_BASE || './') : '/',
       server: {
         port: 3000,
         host: '0.0.0.0',
