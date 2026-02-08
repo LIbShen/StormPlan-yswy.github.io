@@ -1,0 +1,6 @@
+name = "yswy-ai-gateway"
+main = "src/index.ts"
+compatibility_date = "2026-02-08"
+
+[vars]
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com"

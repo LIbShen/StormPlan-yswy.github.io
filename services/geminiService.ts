@@ -1,17 +1,36 @@
 import { AI_SYSTEM_INSTRUCTION } from '../constants';
 
+const STORAGE_KEYS = {
+  apiKey: 'yswy_nvidia_api_key',
+  baseUrl: 'yswy_nvidia_base_url',
+  model: 'yswy_nvidia_model',
+} as const;
+
+const safeStorageGet = (key: string) => {
+  try {
+    return window.localStorage.getItem(key) || '';
+  } catch {
+    return '';
+  }
+};
+
 const getBaseUrl = () => {
+  const fromStorage = safeStorageGet(STORAGE_KEYS.baseUrl).trim();
   const raw =
-    (import.meta.env.VITE_NVIDIA_BASE_URL as string | undefined) || 'https://integrate.api.nvidia.com';
+    fromStorage ||
+    (import.meta.env.VITE_NVIDIA_BASE_URL as string | undefined) ||
+    'https://integrate.api.nvidia.com';
   return raw.replace(/\/+$/, '');
 };
 
 const getModel = () => {
-  return (import.meta.env.VITE_NVIDIA_MODEL as string | undefined) || 'minimaxai/minimax-m2.1';
+  const fromStorage = safeStorageGet(STORAGE_KEYS.model).trim();
+  return fromStorage || (import.meta.env.VITE_NVIDIA_MODEL as string | undefined) || 'minimaxai/minimax-m2.1';
 };
 
 const getApiKey = () => {
-  return (import.meta.env.VITE_NVIDIA_API_KEY as string | undefined) || '';
+  const fromStorage = safeStorageGet(STORAGE_KEYS.apiKey).trim();
+  return fromStorage || (import.meta.env.VITE_NVIDIA_API_KEY as string | undefined) || '';
 };
 
 const useProxy = import.meta.env.DEV;
@@ -19,6 +38,13 @@ const useProxy = import.meta.env.DEV;
 const makeUrl = (path: string) => {
   if (useProxy) return `/nvidia${path}`;
   return `${getBaseUrl()}${path}`;
+};
+
+export const getAiRuntimeConfig = () => {
+  const baseUrl = getBaseUrl();
+  const model = getModel();
+  const apiKey = getApiKey().trim();
+  return { baseUrl, model, hasApiKey: Boolean(apiKey), useProxy };
 };
 
 const buildHeaders = () => {

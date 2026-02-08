@@ -59,10 +59,11 @@ export const AI: React.FC<AIProps> = ({ lang }) => {
       };
       setMessages(prev => [...prev, aiMsg]);
     } catch (error) {
+      const detail = error instanceof Error ? error.message : '';
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        text: "哎呀，小诗连不上英伟达模型接口 😵‍💫。请检查：API 地址、模型名称、API Key 是否正确。",
+        text: `小诗暂时连不上模型接口。${detail ? `（${detail}）` : ''}\n请到“设置 → 小诗AI”填写 API Key；若已填写，再检查 API 地址和模型名称。`,
         timestamp: new Date()
       }]);
     } finally {

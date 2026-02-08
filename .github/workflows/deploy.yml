@@ -34,6 +34,10 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          VITE_NVIDIA_BASE_URL: ${{ vars.VITE_NVIDIA_BASE_URL }}
+          VITE_NVIDIA_MODEL: ${{ vars.VITE_NVIDIA_MODEL }}
+          VITE_VIDEO_BASE_URL: https://media.githubusercontent.com/media/${{ github.repository }}/main/videos
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
