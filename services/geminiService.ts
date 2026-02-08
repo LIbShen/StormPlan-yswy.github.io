@@ -48,6 +48,10 @@ const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs = 1500
 };
 
 const postJson = async <T,>(path: string, body: unknown): Promise<T> => {
+  const baseUrl = getBaseUrl();
+  if (import.meta.env.PROD && /integrate\.api\.nvidia\.com/i.test(baseUrl)) {
+    throw new Error('AI 网关未配置：请将 VITE_NVIDIA_BASE_URL 设置为你的 AI 网关地址后重新部署。');
+  }
   const res = await fetchWithTimeout(
     makeUrl(path),
     {
